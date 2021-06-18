@@ -98,15 +98,16 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
         setContentView(R.layout.activity_graph);
 
         // get location permission
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
-                || ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
-                || ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+        if (false && (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                || ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)) {
+//                || ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(GraphActivity.this, new String[] {
+
                     Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.ACCESS_COARSE_LOCATION,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+//                    Manifest.permission.WRITE_EXTERNAL_STORAGE
             },0);
-            finish();
+//            finish();
         }
 
         //defining needed variables
@@ -159,8 +160,12 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
         Toast.makeText(GraphActivity.this, "Stride Length: " + strideLength, Toast.LENGTH_SHORT).show();
 
         //starting GPS location tracking
-        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, GraphActivity.this);
+        try {
+            locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, GraphActivity.this);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         //starting sensors
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
@@ -205,7 +210,7 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
 
                     createFiles();
 
-                    if (usingDefaultCounter)
+                    if (usingDefaultCounter && dataFileWriter != null)
                         dataFileWriter.writeToFile("Linear_Acceleration",
                                 "TYPE_LINEAR_ACCELERATION will not be recorded, since the TYPE_STEP_DETECTOR is being used instead."
                         );
@@ -214,12 +219,14 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
                     initialHeading = MagneticFieldOrientation.getHeading(currGravity, currMag, magBias);
 
                     //saving initial orientation data
-                    dataFileWriter.writeToFile("Initial_Orientation", "init_Gravity: " + Arrays.toString(currGravity));
-                    dataFileWriter.writeToFile("Initial_Orientation", "init_Mag: " + Arrays.toString(currMag));
-                    dataFileWriter.writeToFile("Initial_Orientation", "mag_Bias: " + Arrays.toString(magBias));
-                    dataFileWriter.writeToFile("Initial_Orientation", "gyro_Bias: " + Arrays.toString(gyroBias));
-                    dataFileWriter.writeToFile("Initial_Orientation", "init_Orientation: " + Arrays.deepToString(initialOrientation));
-                    dataFileWriter.writeToFile("Initial_Orientation", "init_Heading: " + initialHeading);
+                    if (dataFileWriter != null) {
+                        dataFileWriter.writeToFile("Initial_Orientation", "init_Gravity: " + Arrays.toString(currGravity));
+                        dataFileWriter.writeToFile("Initial_Orientation", "init_Mag: " + Arrays.toString(currMag));
+                        dataFileWriter.writeToFile("Initial_Orientation", "mag_Bias: " + Arrays.toString(magBias));
+                        dataFileWriter.writeToFile("Initial_Orientation", "gyro_Bias: " + Arrays.toString(gyroBias));
+                        dataFileWriter.writeToFile("Initial_Orientation", "init_Orientation: " + Arrays.deepToString(initialOrientation));
+                        dataFileWriter.writeToFile("Initial_Orientation", "init_Heading: " + initialHeading);
+                    }
 
 //                Log.d("init_heading", "" + initialHeading);
 
@@ -228,12 +235,14 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
 
                     gyroscopeEulerOrientation = new GyroscopeEulerOrientation(ExtraFunctions.IDENTITY_MATRIX);
 
-                    dataFileWriter.writeToFile("XY_Data_Set", "Initial_orientation: " +
-                            Arrays.deepToString(initialOrientation));
-                    dataFileWriter.writeToFile("Gyroscope_Uncalibrated", "Gyroscope_bias: " +
-                            Arrays.toString(gyroBias));
-                    dataFileWriter.writeToFile("Magnetic_Field_Uncalibrated", "Magnetic_field_bias:" +
-                            Arrays.toString(magBias));
+                    if (dataFileWriter != null) {
+                        dataFileWriter.writeToFile("XY_Data_Set", "Initial_orientation: " +
+                                Arrays.deepToString(initialOrientation));
+                        dataFileWriter.writeToFile("Gyroscope_Uncalibrated", "Gyroscope_bias: " +
+                                Arrays.toString(gyroBias));
+                        dataFileWriter.writeToFile("Magnetic_Field_Uncalibrated", "Magnetic_field_bias:" +
+                                Arrays.toString(magBias));
+                    }
 
                     fabButton.setImageDrawable(ContextCompat.getDrawable(GraphActivity.this, R.drawable.ic_pause_black_24dp));
 
@@ -285,7 +294,8 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
     protected void onStop() {
         super.onStop();
         sensorManager.unregisterListener(this);
-        locationManager.removeUpdates(this);
+        if (locationManager != null)
+            locationManager.removeUpdates(this);
     }
 
     @Override
@@ -306,7 +316,8 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
                 finish();
             }
 
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, GraphActivity.this);
+            if (locationManager != null)
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, GraphActivity.this);
 
             if (isCalibrated) {
                 sensorManager.registerListener(GraphActivity.this,
@@ -368,7 +379,8 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
             if (event.sensor.getType() == Sensor.TYPE_GRAVITY) {
                 ArrayList<Float> dataValues = ExtraFunctions.arrayToList(event.values);
                 dataValues.add(0, (float)(event.timestamp - startTime));
-                dataFileWriter.writeToFile("Gravity", dataValues);
+                if (dataFileWriter != null)
+                    dataFileWriter.writeToFile("Gravity", dataValues);
             } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD || event.sensor.getType() ==
                     Sensor.TYPE_MAGNETIC_FIELD_UNCALIBRATED) {
 
@@ -383,7 +395,8 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
                 );
                 dataValues.add(0, (float)(event.timestamp - startTime));
                 dataValues.add(magHeading);
-                dataFileWriter.writeToFile("Magnetic_Field_Uncalibrated", dataValues);
+                if (dataFileWriter != null)
+                    dataFileWriter.writeToFile("Magnetic_Field_Uncalibrated", dataValues);
 
             } else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE ||
                     event.sensor.getType() == Sensor.TYPE_GYROSCOPE_UNCALIBRATED) {
@@ -402,7 +415,9 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
                 );
                 dataValues.add(0, (float)(event.timestamp - startTime));
                 dataValues.add(gyroHeading);
-                dataFileWriter.writeToFile("Gyroscope_Uncalibrated", dataValues);
+
+                if (dataFileWriter != null)
+                    dataFileWriter.writeToFile("Gyroscope_Uncalibrated", dataValues);
 
             } else if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
 
@@ -421,7 +436,8 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
                     ArrayList<Float> dataValues = ExtraFunctions.arrayToList(event.values);
                     dataValues.add(0, (float)(event.timestamp - startTime));
                     dataValues.add(1f);
-                    dataFileWriter.writeToFile("Linear_Acceleration", dataValues);
+                    if (dataFileWriter != null)
+                        dataFileWriter.writeToFile("Linear_Acceleration", dataValues);
 
                     //complimentary filter
                     float compHeading = ExtraFunctions.calcCompHeading(magHeading, gyroHeading);
@@ -443,17 +459,18 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
                     scatterPlot.addPoint(rPointX, rPointY);
 
                     //saving XY location data
-                    dataFileWriter.writeToFile("XY_Data_Set",
-                            weeksGPS,
-                            secondsGPS,
-                            (event.timestamp - startTime),
-                            strideLength,
-                            magHeading,
-                            gyroHeading,
-                            oPointX,
-                            oPointY,
-                            rPointX,
-                            rPointY);
+                    if (dataFileWriter != null)
+                        dataFileWriter.writeToFile("XY_Data_Set",
+                                weeksGPS,
+                                secondsGPS,
+                                (event.timestamp - startTime),
+                                strideLength,
+                                magHeading,
+                                gyroHeading,
+                                oPointX,
+                                oPointY,
+                                rPointX,
+                                rPointY);
 
                     mLinearLayout.removeAllViews();
                     mLinearLayout.addView(scatterPlot.getGraphView(getApplicationContext()));
@@ -464,7 +481,8 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
                     ArrayList<Float> dataValues = ExtraFunctions.arrayToList(event.values);
                     dataValues.add(0, (float) event.timestamp);
                     dataValues.add(0f);
-                    dataFileWriter.writeToFile("Linear_Acceleration", dataValues);
+                    if (dataFileWriter != null)
+                        dataFileWriter.writeToFile("Linear_Acceleration", dataValues);
                 }
 
             } else if (event.sensor.getType() == Sensor.TYPE_STEP_DETECTOR) {
@@ -493,17 +511,18 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
                     scatterPlot.addPoint(rPointX, rPointY);
 
                     //saving XY location data
-                    dataFileWriter.writeToFile("XY_Data_Set",
-                            weeksGPS,
-                            secondsGPS,
-                            (event.timestamp - startTime),
-                            strideLength,
-                            magHeading,
-                            gyroHeading,
-                            oPointX,
-                            oPointY,
-                            rPointX,
-                            rPointY);
+                    if (dataFileWriter != null)
+                        dataFileWriter.writeToFile("XY_Data_Set",
+                                weeksGPS,
+                                secondsGPS,
+                                (event.timestamp - startTime),
+                                strideLength,
+                                magHeading,
+                                gyroHeading,
+                                oPointX,
+                                oPointY,
+                                rPointX,
+                                rPointY);
 
                     mLinearLayout.removeAllViews();
                     mLinearLayout.addView(scatterPlot.getGraphView(getApplicationContext()));
@@ -531,14 +550,14 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
     public void onProviderDisabled(String provider) {}
 
     private void createFiles() {
-        if (!areFilesCreated) {
-            try {
-                dataFileWriter = new DataFileWriter(FOLDER_NAME, DATA_FILE_NAMES, DATA_FILE_HEADINGS);
-            } catch (IOException e) {
-                Log.e("GraphActivity", e.toString());
-            }
-            areFilesCreated = true;
-        }
+//        if (!areFilesCreated) {
+//            try {
+//                dataFileWriter = new DataFileWriter(FOLDER_NAME, DATA_FILE_NAMES, DATA_FILE_HEADINGS);
+//            } catch (IOException e) {
+//                Log.e("GraphActivity", e.toString());
+//            }
+//            areFilesCreated = true;
+//        }
     }
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
